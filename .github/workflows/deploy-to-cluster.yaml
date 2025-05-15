@@ -1,0 +1,57 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        type: string
+        description: Specify the SHA to build
+        required: true
+      environment:
+        type: string
+        required: true
+      ECR_ACCOUNT:
+        type: string
+        required: true
+      ECR_REPO:
+        type: string
+        required: true
+      NEW_IMAGE_TAG:
+        type: string
+        required: true
+      AWS_REGION:
+        type: string
+        required: true
+      ECS_CLUSTER:
+        type: string
+        required: true
+      DEPLOYMENT_TYPE:
+        type: string
+        default: "continuous"
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      POSTMAN_API_KEY:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: false
+
+jobs:
+  Deploy:
+    uses: gitkraken/reusable-github-actions/.github/workflows/ecs-deploy-multiple.yaml@main
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    with:
+      SHA: ${{ inputs.sha }}
+      environment: ${{ inputs.environment }}
+      ECR_ACCOUNT: ${{ inputs.ECR_ACCOUNT }}
+      ECR_REPO: ${{ inputs.ECR_REPO }}
+      AWS_REGION: ${{ inputs.AWS_REGION }}
+      NEW_IMAGE_TAG: ${{ inputs.NEW_IMAGE_TAG }}
+      ECS_CLUSTER: ${{ inputs.ECS_CLUSTER }}
+      ECS_SERVICES_JSON: '["api-service-public", "api-service-internal", "api-service-admin", "api-service-worker"]'
+      SEND_SLACK_NOTIFICATION: true

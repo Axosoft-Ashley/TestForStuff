@@ -1,0 +1,17 @@
+name: Pull Request Checker
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  Code-Quality-Checks:
+    # We can't use the reusable action for this repo since this repo requires 'build' to be run before 'lint'
+    uses: ./.github/workflows/code-quality-checks.yaml
+    secrets:
+      NPMRC_FILE: ${{ secrets.NPMRC_FILE }}
+      YARNRC_FILE: ${{ secrets.YARNRC_FILE }}
+    with:
+      SHA: ${{ github.sha }}
+      NODE_VERSION: '22.x'

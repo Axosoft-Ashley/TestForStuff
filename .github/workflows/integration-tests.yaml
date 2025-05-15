@@ -1,0 +1,50 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        type: string
+        description: Specify the SHA to build
+        required: true
+      environment:
+        type: string
+        required: true
+      POSTMAN_ENVIRONMENT_UUID:
+        type: string
+        required: true
+    secrets:
+      POSTMAN_API_KEY:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  Integration-Tests-Public-API:
+    uses: gitkraken/reusable-github-actions/.github/workflows/reusable-integration-test.yaml@main
+    secrets:
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+    with:
+      SHA: ${{inputs.sha}}
+      POSTMAN_COLLECTION_UUID: '26418833-9231a33c-283c-45ad-9db7-10c56153171d'
+      POSTMAN_ENVIRONMENT_UUID: ${{ inputs.POSTMAN_ENVIRONMENT_UUID }}
+      FOLDERS: '["Public API"]'
+  Integration-Tests-Internal-API:
+    uses: gitkraken/reusable-github-actions/.github/workflows/reusable-integration-test.yaml@main
+    secrets:
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+    with:
+      SHA: ${{inputs.sha}}
+      POSTMAN_COLLECTION_UUID: '26418833-9231a33c-283c-45ad-9db7-10c56153171d'
+      POSTMAN_ENVIRONMENT_UUID: ${{ inputs.POSTMAN_ENVIRONMENT_UUID }}
+      FOLDERS: '["Internal API"]'
+  Integration-Tests-Admin-API:
+    uses: gitkraken/reusable-github-actions/.github/workflows/reusable-integration-test.yaml@main
+    secrets:
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+    with:
+      SHA: ${{inputs.sha}}
+      POSTMAN_COLLECTION_UUID: '26418833-9231a33c-283c-45ad-9db7-10c56153171d'
+      POSTMAN_ENVIRONMENT_UUID: ${{ inputs.POSTMAN_ENVIRONMENT_UUID }}
+      FOLDERS: '["Admin API"]'
+

@@ -1,0 +1,55 @@
+name: Code Quality Checks
+on:
+  workflow_call:
+    inputs:
+      SHA:
+        description: "full sha to build"
+        type: string
+        required: true
+      NODE_VERSION:
+        description: "Node version to use"
+        type: string
+        required: true
+    secrets:
+      NPMRC_FILE:
+        required: true
+        description: "NPM RC file data"
+      YARNRC_FILE:
+        required: true
+        description: "Yarn RC file data"
+
+jobs:
+  Checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        with:
+          ref: ${{ inputs.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@a9893b0cfb0821c9c7b5fec28a6a2e6cdd5e20a4
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+
+      - name: Set NPM
+        run: echo "${{ secrets.NPMRC_FILE }}" > ~/.npmrc
+
+      - name: Set YARN
+        run: echo "${{ secrets.YARNRC_FILE }}" > ~/.yarnrc
+
+      - name: Add global node-gyp
+        run: yarn global add node-gyp
+
+      - name: Load modules
+        run: yarn install
+
+      - name: Run Build
+        run: npm run build --if-present
+
+      - name: Run Lint
+        run: npm run lint --if-present
+
+      - name: Run Tests
+        run: npm run test --if-present
