@@ -1,0 +1,126 @@
+name: Hot Fix
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Specify the SHA to build
+        required: true
+      environment:
+        type: choice
+        description: Select the environment
+        required: true
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  Code-Quality-Checks:
+    if: ${{ 'gitkraken/codesee-service' == github.repository }}
+    uses: ./.github/workflows/code-quality-checks.yaml
+    secrets:
+      NPMRC_FILE: ${{ secrets.NPMRC_FILE }}
+      YARNRC_FILE: ${{ secrets.YARNRC_FILE }}
+    with:
+      SHA: ${{ inputs.sha }}
+      NODE_VERSION: '22.x'
+  Build:
+    needs: [ Code-Quality-Checks ]
+    uses: ./.github/workflows/ecr-build-push.yaml
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.DEV_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}
+      NPMRC_FILE: ${{ secrets.NPMRC_FILE }}
+      YARNRC_FILE: ${{ secrets.YARNRC_FILE }}
+      GK_ENTERPRISE_SIGN: ${{ secrets.GK_ENTERPRISE_SIGN }}
+    with:
+      SHA: ${{ inputs.sha }}
+      ECR_ACCOUNT: '953684725979'
+      ECR_REPO: 'codesee-service'
+      AWS_REGION: 'us-east-1'
+      NODE_VERSION: '22.x'
+  Deploy-Dev:
+    needs: [ Build ]
+    if: ${{ inputs.environment == 'dev'}}
+    uses: ./.github/workflows/deploy-to-cluster.yaml
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.DEV_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    with:
+      SHA: ${{inputs.sha}}
+      environment: 'dev'
+      NEW_IMAGE_TAG: 'dev'
+      ECR_ACCOUNT: '953684725979'
+      ECR_REPO: 'codesee-service'
+      AWS_REGION: 'us-east-1'
+      ECS_CLUSTER: 'dev-prv'
+      DEPLOYMENT_TYPE: 'manual'
+  Test-Dev:
+    needs: [ Deploy-Dev ]
+    uses: ./.github/workflows/integration-tests.yaml
+    secrets:
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    with:
+      SHA: ${{inputs.sha}}
+      environment: 'dev'
+      POSTMAN_ENVIRONMENT_UUID: '27038339-03ddd4ab-2ac1-4f6c-b0ea-a7ed1a49cd53'
+  Deploy-Staging:
+    needs: [ Build ]
+    if: ${{ inputs.environment == 'staging'}}
+    uses: ./.github/workflows/deploy-to-cluster.yaml
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    with:
+      SHA: ${{inputs.sha}}
+      environment: 'staging'
+      NEW_IMAGE_TAG: 'staging'
+      ECR_ACCOUNT: '953684725979'
+      ECR_REPO: 'codesee-service'
+      AWS_REGION: 'us-east-1'
+      ECS_CLUSTER: 'staging-prv'
+      DEPLOYMENT_TYPE: 'manual'
+  Test-Staging:
+    needs: [ Deploy-Staging ]
+    uses: ./.github/workflows/integration-tests.yaml
+    secrets:
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    with:
+      SHA: ${{inputs.sha}}
+      environment: 'staging'
+      POSTMAN_ENVIRONMENT_UUID: '27080905-7c894133-61df-4af9-bbff-6e2c1c09c391'
+  Deploy-Prod:
+    needs: [ Build ]
+    if: ${{ inputs.environment == 'prod'}}
+    uses: ./.github/workflows/deploy-to-cluster.yaml
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    with:
+      SHA: ${{inputs.sha}}
+      environment: 'prod'
+      NEW_IMAGE_TAG: 'prod'
+      ECR_ACCOUNT: '953684725979'
+      ECR_REPO: 'codesee-service'
+      AWS_REGION: 'us-east-1'
+      ECS_CLUSTER: 'prod-prv'
+      DEPLOYMENT_TYPE: 'manual'
+  Test-Prod:
+    needs: [ Deploy-Prod ]
+    uses: ./.github/workflows/integration-tests.yaml
+    secrets:
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    with:
+      SHA: ${{inputs.sha}}
+      environment: 'prod'
+      POSTMAN_ENVIRONMENT_UUID: '27080905-54654add-7b43-4e1d-a4d3-e2ff6d0a0b9f'

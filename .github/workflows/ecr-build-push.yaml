@@ -1,0 +1,101 @@
+name: Build and Push
+on:
+  workflow_call:
+    inputs:
+      SHA:
+        description: "full sha to build"
+        type: string
+        required: true
+      ECR_ACCOUNT:
+        type: string
+        required: true
+      ECR_REPO:
+        type: string
+        required: true
+      AWS_REGION:
+        type: string
+        required: true
+      DOCKERFILE:
+        type: string
+        default: "Dockerfile"
+      NODE_VERSION:
+        description: "Node version to use"
+        type: string
+        required: true
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      NPMRC_FILE:
+        required: true
+        description: "NPM RC file data"
+      YARNRC_FILE:
+        required: true
+        description: "Yarn RC file data"
+      GK_ENTERPRISE_SIGN:
+        required: false
+        description: "Signature file for GK Enterprise"
+
+jobs:
+  Build:
+    name: Build and Push Container
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
+        with:
+          ref: ${{ inputs.sha }}
+
+      - name: Set Build Hash
+        run: |
+          echo "git_hash=$(git rev-parse --short "${{ inputs.SHA }}")" >> $GITHUB_ENV
+
+      - name: Set Build Date
+        run: |
+          echo "BUILD_DATE=$(date -u +"%m/%d/%Y %T %Z")" >> $GITHUB_ENV
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@05b148adc31e091bafbaf404f745055d4d3bc9d2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@261a7de32bda11ba01f4d75c4ed6caf3739e54be
+        with:
+          registries: ${{ inputs.ECR_ACCOUNT }}
+
+      - name: Set up Node
+        uses: actions/setup-node@a9893b0cfb0821c9c7b5fec28a6a2e6cdd5e20a4
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+
+      - name: Set NPM
+        run: echo "${{ secrets.NPMRC_FILE }}" > ~/.npmrc
+
+      - name: Set YARN
+        run: echo "${{ secrets.YARNRC_FILE }}" > ~/.yarnrc
+
+      # We need to create an empty config file so that app can startup
+      # These values are pulled down from the AWS Secrets Manager
+#      - name: Empty Config File
+#        run: echo "{}" > config/config.json
+
+      - name: Load modules
+        run: yarn install
+
+      - name: Build and Push to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ inputs.ECR_REPO }}
+          IMAGE_TAG: ${{ env.git_hash }}
+          DOCKERFILE: ${{ inputs.DOCKERFILE }}
+          BUILD_DATE: ${{ env.BUILD_DATE }}
+          GK_ENTERPRISE_SIGN: ${{ secrets.GK_ENTERPRISE_SIGN }}
+        run: |
+          docker build --build-arg GK_ENTERPRISE_SIGN --build-arg COMMIT=$IMAGE_TAG --build-arg BUILD_DATE="$BUILD_DATE" -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -f $DOCKERFILE .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
